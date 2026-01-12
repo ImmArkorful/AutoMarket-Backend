@@ -27,6 +27,7 @@ const defaultAllowedOrigins = new Set([
   "http://127.0.0.1:4173",
   "http://127.0.0.1:3001",
   "http://localhost:3001",
+  "http://13.218.173.57:3001"
 ]);
 
 // Add any additional origins from environment variable
