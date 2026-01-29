@@ -348,4 +348,151 @@ router.get("/listings", authenticateToken, async (req, res) => {
   }
 });
 
+// POST /recently-viewed/:carId - Track recently viewed car (protected)
+router.post("/recently-viewed/:carId", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { carId } = req.params;
+
+    // Ensure car exists
+    const carResult = await db.query("SELECT id FROM cars WHERE id = $1", [carId]);
+    if (carResult.rows.length === 0) {
+      return res.status(404).json({ error: "Car listing not found." });
+    }
+
+    await db.query(
+      `
+      INSERT INTO recently_viewed (user_id, car_id, viewed_at)
+      VALUES ($1, $2, CURRENT_TIMESTAMP)
+      ON CONFLICT (user_id, car_id)
+      DO UPDATE SET viewed_at = EXCLUDED.viewed_at
+    `,
+      [userId, carId]
+    );
+
+    res.status(201).json({ message: "Recently viewed updated." });
+  } catch (error) {
+    console.error("Error updating recently viewed:", error);
+    res.status(500).json({ error: "Failed to update recently viewed." });
+  }
+});
+
+// GET /recently-viewed - Get user's recently viewed cars (protected)
+router.get("/recently-viewed", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const countResult = await db.query(
+      "SELECT COUNT(*) FROM recently_viewed WHERE user_id = $1",
+      [userId]
+    );
+    const totalCount = parseInt(countResult.rows[0].count);
+    const totalPages = Math.ceil(totalCount / limit);
+
+    const result = await db.query(
+      `
+      SELECT 
+        rv.viewed_at,
+        c.id,
+        c.seller_id,
+        c.make,
+        c.model,
+        c.year,
+        c.price,
+        c.body_type,
+        c.fuel_type,
+        c.transmission,
+        c.engine,
+        c.color,
+        c.doors,
+        c.co2_emissions,
+        c.description,
+        c.image_urls,
+        c.status,
+        c.created_at,
+        c.updated_at
+      FROM recently_viewed rv
+      INNER JOIN cars c ON rv.car_id = c.id
+      WHERE rv.user_id = $1
+      ORDER BY rv.viewed_at DESC
+      LIMIT $2 OFFSET $3
+    `,
+      [userId, limit, offset]
+    );
+
+    const recentlyViewed = result.rows.map((row) => ({
+      viewed_at: row.viewed_at,
+      car: {
+        id: row.id,
+        seller_id: row.seller_id,
+        make: row.make,
+        model: row.model,
+        year: row.year,
+        price: parseFloat(row.price),
+        body_type: row.body_type,
+        fuel_type: row.fuel_type,
+        transmission: row.transmission,
+        engine: row.engine,
+        color: row.color,
+        doors: row.doors,
+        co2_emissions: row.co2_emissions,
+        description: row.description,
+        image_urls: row.image_urls || [],
+        status: row.status,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
+    }));
+
+    res.json({
+      recentlyViewed,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        hasMore: page < totalPages,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching recently viewed:", error);
+    res.status(500).json({ error: "Failed to fetch recently viewed." });
+  }
+});
+
+// POST /alerts - Enable saved search alerts per category (protected)
+router.post("/alerts", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Accept category from body or query, and normalize
+    const rawCategory = (req.body && req.body.category) || req.query.category;
+    const category =
+      typeof rawCategory === "string" && rawCategory.trim()
+        ? rawCategory.trim().toLowerCase()
+        : null;
+
+    if (!category) {
+      return res.status(400).json({ error: "Category is required." });
+    }
+
+    await db.query(
+      `
+      INSERT INTO search_alerts (user_id, category)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id, category) DO NOTHING
+    `,
+      [userId, category]
+    );
+
+    res.status(201).json({ message: "Alerts enabled for category.", category });
+  } catch (error) {
+    console.error("Error enabling alerts:", error);
+    res.status(500).json({ error: "Failed to enable alerts." });
+  }
+});
+
 module.exports = router;

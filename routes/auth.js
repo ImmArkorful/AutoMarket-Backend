@@ -44,16 +44,15 @@ router.post("/register", async (req, res) => {
     // Hash password and create user
     const passwordHash = await bcrypt.hash(password, 10);
     const newUser = await db.query(
-      "INSERT INTO users (email, password_hash, name, phone) VALUES ($1, $2, $3, $4) RETURNING id, email, name, phone, created_at",
+      "INSERT INTO users (email, password_hash, name, phone) VALUES ($1, $2, $3, $4) RETURNING id, email, name, phone, role, created_at",
       [email, passwordHash, name || null, phone || null]
     );
 
     const userData = newUser.rows[0];
 
     const token = jwt.sign(
-      { userId: userData.id, email: userData.email },
-      process.env.JWT_SECRET || "fallback_secret",
-      { expiresIn: "7d" }
+      { userId: userData.id, email: userData.email, role: userData.role },
+      process.env.JWT_SECRET || "fallback_secret"
     );
 
     res.status(201).json({
@@ -64,6 +63,7 @@ router.post("/register", async (req, res) => {
         email: userData.email,
         name: userData.name,
         phone: userData.phone,
+        role: userData.role,
         created_at: userData.created_at,
       },
     });
@@ -104,9 +104,8 @@ router.post("/login", async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET || "fallback_secret",
-      { expiresIn: "7d" }
+      { userId: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET || "fallback_secret"
     );
 
     res.json({
@@ -117,6 +116,7 @@ router.post("/login", async (req, res) => {
         email: user.email,
         name: user.name,
         phone: user.phone,
+        role: user.role,
         created_at: user.created_at,
       },
     });

@@ -6,7 +6,11 @@ const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./swagger");
 const authRoutes = require("./routes/auth");
 const carsRoutes = require("./routes/cars");
+const bikesRoutes = require("./routes/bikes");
+const trucksRoutes = require("./routes/trucks");
+const partsRoutes = require("./routes/parts");
 const userRoutes = require("./routes/user");
+const adminRoutes = require("./routes/admin");
 require("dotenv").config();
 
 const app = express();
@@ -27,6 +31,7 @@ const defaultAllowedOrigins = new Set([
   "http://127.0.0.1:4173",
   "http://127.0.0.1:3001",
   "http://localhost:3001",
+  "http://localhost:4000",
   "http://13.218.173.57:3001"
 ]);
 
@@ -96,7 +101,11 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/cars", carsRoutes);
+app.use("/api/bikes", bikesRoutes);
+app.use("/api/trucks", trucksRoutes);
+app.use("/api/parts", partsRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/admin", adminRoutes);
 
 // API health check
 app.get("/api/health", (req, res) => {

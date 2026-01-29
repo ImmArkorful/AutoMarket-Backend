@@ -103,31 +103,60 @@ router.get("/", async (req, res) => {
 
     const result = await db.query(carsQuery, params);
 
-    // Format response
-    const cars = result.rows.map((row) => ({
-      id: row.id,
-      seller_id: row.seller_id,
-      seller: {
-        name: row.seller_name,
-        phone: row.seller_phone,
-      },
-      make: row.make,
-      model: row.model,
-      year: row.year,
-      price: parseFloat(row.price),
-      body_type: row.body_type,
-      fuel_type: row.fuel_type,
-      transmission: row.transmission,
-      engine: row.engine,
-      color: row.color,
-      doors: row.doors,
-      co2_emissions: row.co2_emissions,
-      description: row.description,
-      image_urls: row.image_urls || [],
-      status: row.status,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    }));
+    // Format response (include both snake_case and camelCase fields)
+    const cars = result.rows.map((row) => {
+      const imageUrls = row.image_urls || [];
+      const priceNumber = parseFloat(row.price);
+
+      return {
+        // core identifiers
+        id: row.id,
+        seller_id: row.seller_id,
+
+        // seller info
+        seller: {
+          name: row.seller_name,
+          phone: row.seller_phone,
+        },
+
+        // original snake_case fields (backward compatibility)
+        make: row.make,
+        model: row.model,
+        year: row.year,
+        price: priceNumber,
+        body_type: row.body_type,
+        fuel_type: row.fuel_type,
+        transmission: row.transmission,
+        engine: row.engine,
+        color: row.color,
+        doors: row.doors,
+        co2_emissions: row.co2_emissions,
+        description: row.description,
+        image_urls: imageUrls,
+        status: row.status,
+        mileage: row.mileage,
+        location: row.location,
+        vin_number: row.vin_number,
+        equipment: row.equipment || [],
+        cylindrics: row.cylindrics,
+        hp_kw: row.hp_kw,
+        is_best_offer: row.is_best_offer,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+
+        // camelCase fields expected by frontend
+        name: [row.make, row.model].filter(Boolean).join(" "),
+        fabrication: row.year ? String(row.year) : null,
+        bodyType: row.body_type,
+        fuel: row.fuel_type,
+        co2Emissions: row.co2_emissions,
+        imageUrl: imageUrls[0] || null,
+        images: imageUrls,
+        vinNumber: row.vin_number,
+        hpKw: row.hp_kw,
+        isBestOffer: row.is_best_offer,
+      };
+    });
 
     res.json({
       cars,
@@ -169,6 +198,9 @@ router.get("/:id", async (req, res) => {
     }
 
     const row = result.rows[0];
+    const imageUrls = row.image_urls || [];
+    const priceNumber = parseFloat(row.price);
+
     const car = {
       id: row.id,
       seller_id: row.seller_id,
@@ -177,10 +209,11 @@ router.get("/:id", async (req, res) => {
         phone: row.seller_phone,
         email: row.seller_email,
       },
+      // snake_case
       make: row.make,
       model: row.model,
       year: row.year,
-      price: parseFloat(row.price),
+      price: priceNumber,
       body_type: row.body_type,
       fuel_type: row.fuel_type,
       transmission: row.transmission,
@@ -189,10 +222,28 @@ router.get("/:id", async (req, res) => {
       doors: row.doors,
       co2_emissions: row.co2_emissions,
       description: row.description,
-      image_urls: row.image_urls || [],
+      image_urls: imageUrls,
       status: row.status,
+      mileage: row.mileage,
+      location: row.location,
+      vin_number: row.vin_number,
+      equipment: row.equipment || [],
+      cylindrics: row.cylindrics,
+      hp_kw: row.hp_kw,
+      is_best_offer: row.is_best_offer,
       created_at: row.created_at,
       updated_at: row.updated_at,
+      // camelCase for frontend
+      name: [row.make, row.model].filter(Boolean).join(" "),
+      fabrication: row.year ? String(row.year) : null,
+      bodyType: row.body_type,
+      fuel: row.fuel_type,
+      co2Emissions: row.co2_emissions,
+      imageUrl: imageUrls[0] || null,
+      images: imageUrls,
+      vinNumber: row.vin_number,
+      hpKw: row.hp_kw,
+      isBestOffer: row.is_best_offer,
     };
 
     res.json({ car });
@@ -207,6 +258,7 @@ router.post("/", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const {
+      // legacy snake_case
       make,
       model,
       year,
@@ -221,10 +273,35 @@ router.post("/", authenticateToken, async (req, res) => {
       description,
       image_urls,
       status = "active",
+      mileage,
+      location,
+      vin_number,
+      equipment,
+      cylindrics,
+      hp_kw,
+      is_best_offer,
+      // camelCase from frontend
+      manufacturer,
+      fabrication,
+      bodyType,
+      fuelType,
+      vinNumber,
+      co2Emissions,
+      hpKw,
+      isBestOffer,
     } = req.body;
 
+    const finalMake = make || manufacturer || null;
+    const finalYear = year || fabrication;
+    const finalBodyType = body_type || bodyType || null;
+    const finalFuelType = fuel_type || fuelType || null;
+    const finalCo2 = co2_emissions || co2Emissions || null;
+    const finalVin = vin_number || vinNumber || null;
+    const finalHpKw = hp_kw || hpKw || null;
+    const finalIsBestOffer = typeof is_best_offer === "boolean" ? is_best_offer : !!isBestOffer;
+
     // Validate required fields
-    if (!model || !year || !price) {
+    if (!model || !finalYear || !price) {
       return res.status(400).json({
         error: "Model, year, and price are required fields.",
       });
@@ -237,7 +314,7 @@ router.post("/", authenticateToken, async (req, res) => {
 
     // Validate year
     const currentYear = new Date().getFullYear();
-    if (isNaN(year) || parseInt(year) < 1900 || parseInt(year) > currentYear + 1) {
+    if (isNaN(finalYear) || parseInt(finalYear) < 1900 || parseInt(finalYear) > currentYear + 1) {
       return res.status(400).json({
         error: `Year must be between 1900 and ${currentYear + 1}.`,
       });
@@ -246,32 +323,46 @@ router.post("/", authenticateToken, async (req, res) => {
     // Validate image_urls (should be an array)
     const imageUrls = Array.isArray(image_urls) ? image_urls : image_urls ? [image_urls] : [];
 
+    const equipmentArray = Array.isArray(equipment)
+      ? equipment
+      : equipment
+      ? [equipment]
+      : [];
+
     // Insert car listing
     const result = await db.query(
       `
       INSERT INTO cars (
         seller_id, make, model, year, price, body_type, fuel_type,
         transmission, engine, color, doors, co2_emissions, description,
-        image_urls, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        image_urls, status, mileage, location, vin_number, equipment,
+        cylindrics, hp_kw, is_best_offer
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
       RETURNING *
     `,
       [
         userId,
-        make || null,
+        finalMake,
         model,
-        parseInt(year),
+        parseInt(finalYear),
         parseFloat(price),
-        body_type || null,
-        fuel_type || null,
+        finalBodyType,
+        finalFuelType,
         transmission || null,
         engine || null,
         color || null,
         doors ? parseInt(doors) : null,
-        co2_emissions || null,
+        finalCo2,
         description || null,
         imageUrls,
         status,
+        mileage ? parseInt(mileage) : null,
+        location || null,
+        finalVin,
+        equipmentArray,
+        cylindrics ? parseInt(cylindrics) : null,
+        finalHpKw,
+        finalIsBestOffer,
       ]
     );
 
@@ -295,6 +386,13 @@ router.post("/", authenticateToken, async (req, res) => {
         description: car.description,
         image_urls: car.image_urls || [],
         status: car.status,
+        mileage: car.mileage,
+        location: car.location,
+        vin_number: car.vin_number,
+        equipment: car.equipment || [],
+        cylindrics: car.cylindrics,
+        hp_kw: car.hp_kw,
+        is_best_offer: car.is_best_offer,
         created_at: car.created_at,
         updated_at: car.updated_at,
       },
