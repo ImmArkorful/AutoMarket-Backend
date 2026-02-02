@@ -36,7 +36,7 @@ const defaultAllowedOrigins = new Set([
   "http://localhost:4000",
   "http://62.72.22.6:4000",
   "http://13.218.173.57:3001",
-  "https://automarket-seller.vercel.app/"
+  "https://automarket-seller.vercel.app"
 ]);
 
 // Add any additional origins from environment variable
