@@ -37,7 +37,7 @@ const defaultAllowedOrigins = new Set([
   "http://localhost:3001",
   "http://localhost:4000",
   "http://62.72.22.6:4000",
-  "http://62.72.22.6:3002",
+  "http://62.72.22.6:4001",
   "http://13.218.173.57:3001",
   "https://automarket-seller.vercel.app"
 ]);
