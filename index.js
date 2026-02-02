@@ -31,6 +31,8 @@ const defaultAllowedOrigins = new Set([
   "http://127.0.0.1:5173",
   "http://localhost:4173",
   "http://127.0.0.1:4173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
   "http://127.0.0.1:3001",
   "http://localhost:3001",
   "http://localhost:4000",
@@ -54,18 +56,34 @@ const allowAllOrigins =
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or Postman)
-    if (!origin) return callback(null, true);
-
-    // Allow same-origin requests (for Swagger UI and same-server requests)
-    if (origin && (origin.includes(`localhost:${PORT}`) || origin.includes(`127.0.0.1:${PORT}`))) {
+    if (!origin) {
+      console.log("✅ CORS: Allowing request with no origin");
       return callback(null, true);
     }
 
-    if (allowAllOrigins || defaultAllowedOrigins.has(origin)) {
+    // Allow same-origin requests (for Swagger UI and same-server requests)
+    if (origin && (origin.includes(`localhost:${PORT}`) || origin.includes(`127.0.0.1:${PORT}`))) {
+      console.log("✅ CORS: Allowing same-origin request:", origin);
+      return callback(null, true);
+    }
+
+    // Allow Vercel preview deployments (wildcard matching)
+    if (origin && origin.includes('.vercel.app')) {
+      console.log("✅ CORS: Allowing Vercel deployment:", origin);
+      return callback(null, true);
+    }
+
+    // Check if origin is in allowed list
+    if (allowAllOrigins) {
+      console.log("✅ CORS: Allowing all origins (ALLOW_ALL_ORIGINS=true)");
+      callback(null, true);
+    } else if (defaultAllowedOrigins.has(origin)) {
+      console.log("✅ CORS: Allowing origin:", origin);
       callback(null, true);
     } else {
       console.log("🚫 CORS blocked origin:", origin);
-      callback(new Error("Not allowed by CORS"));
+      console.log("📋 Allowed origins:", Array.from(defaultAllowedOrigins));
+      callback(new Error(`Not allowed by CORS. Origin: ${origin}`));
     }
   },
   credentials: true,
@@ -120,6 +138,19 @@ app.get("/api/health", (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+  // Handle CORS errors specifically
+  if (err.message && err.message.includes("CORS")) {
+    console.error("❌ CORS Error:", err.message);
+    console.error("   Request Origin:", req.headers.origin);
+    console.error("   Request Path:", req.path);
+    return res.status(403).json({
+      error: "CORS Error",
+      message: err.message,
+      origin: req.headers.origin,
+      allowedOrigins: Array.from(defaultAllowedOrigins),
+    });
+  }
+
   console.error(err.stack);
   res.status(500).json({ 
     error: "Something went wrong!", 
@@ -135,6 +166,14 @@ app.use("*", (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚗 AutoMarket Backend server is running on http://0.0.0.0:${PORT}`);
   console.log(`📱 Frontend URL: ${process.env.FRONTEND_URL || "http://localhost:5173"}`);
+  console.log(`\n🔐 CORS Configuration:`);
+  console.log(`   Allowed origins: ${Array.from(defaultAllowedOrigins).join(', ')}`);
+  console.log(`   ✅ Vercel deployments (*.vercel.app) are automatically allowed`);
+  if (allowAllOrigins) {
+    console.log(`   ⚠️  WARNING: ALLOW_ALL_ORIGINS is enabled - all origins are allowed`);
+  }
+  console.log(`   To add more origins, set FRONTEND_URL environment variable (comma-separated)`);
+  console.log(`   Example: FRONTEND_URL=http://localhost:5173,http://example.com\n`);
 });
 
 module.exports = app;
