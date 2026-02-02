@@ -11,6 +11,8 @@ const trucksRoutes = require("./routes/trucks");
 const partsRoutes = require("./routes/parts");
 const userRoutes = require("./routes/user");
 const adminRoutes = require("./routes/admin");
+const sellerCarsRoutes = require("./routes/seller-cars");
+const sellerDashboardRoutes = require("./routes/seller-dashboard");
 require("dotenv").config();
 
 const app = express();
@@ -33,7 +35,8 @@ const defaultAllowedOrigins = new Set([
   "http://localhost:3001",
   "http://localhost:4000",
   "http://62.72.22.6:4000",
-  "http://13.218.173.57:3001"
+  "http://13.218.173.57:3001",
+  "https://automarket-seller.vercel.app/"
 ]);
 
 // Add any additional origins from environment variable
@@ -107,6 +110,8 @@ app.use("/api/trucks", trucksRoutes);
 app.use("/api/parts", partsRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/seller/cars", sellerCarsRoutes);
+app.use("/api/seller/dashboard", sellerDashboardRoutes);
 
 // API health check
 app.get("/api/health", (req, res) => {
